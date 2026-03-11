@@ -1,0 +1,12 @@
+# Test Case: Student Scans QR Code
+
+## Purpose
+To verify that scanning a valid QR code marks the student present.
+
+## Input
+- Valid session QR code
+- Logged-in student
+
+## Expected Output
+- Attendance record created in database
+- Response: { "status": "success" }

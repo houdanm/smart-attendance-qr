@@ -1,0 +1,21 @@
+# Changelog
+
+## v1.0.0 — Initial Project Setup
+- Created backend folder structure
+- Created mobile app folder structure
+- Added basic README
+
+## v1.1.0 — Backend Progress
+- Added Express server
+- Added attendance routes
+- Added database connection
+
+## v1.2.0 — Mobile App Progress
+- Added Home screen UI
+- Added QR code scanner screen
+- Added navigation
+
+## v1.3.0 — Documentation Added
+- Added README sections
+- Added tests folder
+- Added docs folder

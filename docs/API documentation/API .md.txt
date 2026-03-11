@@ -1,0 +1,24 @@
+# API Endpoints
+
+## POST /api/login
+Authenticates a user.
+
+### Input
+- email
+- password
+
+### Output
+- JWT token
+- user role
+
+---
+
+## POST /api/attendance
+Marks attendance for a session.
+
+### Input
+- studentId
+- sessionId
+
+### Output
+- success message

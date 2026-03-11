@@ -1,0 +1,12 @@
+# Test Case: User Login
+
+## Purpose
+Ensure that valid credentials allow login.
+
+## Input
+email: student@example.com  
+password: correctpassword
+
+## Expected Output
+- Login successful
+- Redirect to Home screen
