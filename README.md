@@ -66,3 +66,47 @@ Infrastructure & Dev Tools:
 Version Control: GitHub
 API Testing: Postman / Thunder Client
 IDE: VS Code / Android Studio
+
+
+Guide to download, install, and test my App 
+
+## 🚀 How to Download, Install, and Run the Project
+
+This project has two parts:
+- **Backend** (Node.js + Express + MySQL)
+- **Mobile App** (React Native + Expo)
+
+Follow the steps below to run the full system.
+
+---
+
+# 📥 1. Download the Project
+
+### Option A — Clone the repository 
+```bash
+git clone https://github.com/houdanm/smart-attendance-qr.git
+cd smart-attendance-qr
+
+How to Run the Mobile App on Expo Go
+The easiest way to test the mobile app is using Expo Go on a real phone.
+
+1. Install Expo Go
+
+Start the Expo server
+Open a Git Bash  terminal and run:
+
+bash
+cd mobile
+npm install
+npx expo start
+This will open the Expo Developer Tools in your browser and show a QR code.
+
+
+Scan the QR Code
+Open Expo Go
+
+Tap Scan QR Code
+
+Scan the QR code from your terminal or browser
+
+The app loads instantly.
