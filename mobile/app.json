@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "SmartAttendance",
+    "slug": "smart-attendance",
+    "version": "1.0.0",
+    "scheme": "smartattendance",
+    "icon": "./assets/images/icon.png",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "backgroundColor": "#0f172a"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SmartAttendance to access your camera."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow SmartAttendance to use your location."
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "backgroundColor": "#0f172a"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.smartattendance.app",
+      "icon": "./assets/images/icon.png"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    }
+  }
+}

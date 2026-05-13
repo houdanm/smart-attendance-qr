@@ -1,0 +1,1622 @@
+cat > /mnt/user-data/outputs/index.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Attendance — Instructor Web Panel</title>
+
+  <!-- QR Code library from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    /* ─── RESET & BASE ─── */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background:#0f172a;
+      color:white;
+      font-family:'Segoe UI',sans-serif;
+      min-height:100vh;
+    }
+
+    /* ─── LOGIN PAGE ─── */
+    .login-page {
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      min-height:100vh; padding:24px;
+    }
+    .login-logo {
+      width:80px; height:80px; border-radius:50%;
+      background:#1e293b; border:2px solid #38bdf8;
+      display:flex; align-items:center; justify-content:center;
+      font-size:36px; margin-bottom:16px;
+    }
+    .login-title { font-size:28px; font-weight:bold; color:#38bdf8; margin-bottom:6px; }
+    .login-sub   { font-size:14px; color:#64748b; margin-bottom:32px; }
+    .login-box {
+      background:#1e293b; border-radius:20px; padding:32px;
+      width:100%; max-width:420px; border:1px solid #334155;
+    }
+    .login-box h2 { font-size:20px; color:#fff; margin-bottom:4px; }
+    .login-box p  { font-size:13px; color:#64748b; margin-bottom:24px; }
+    .field-label  { color:#94a3b8; font-size:13px; font-weight:bold; margin-bottom:8px; display:block; }
+    .input-row {
+      display:flex; align-items:center;
+      background:#0f172a; border-radius:12px;
+      border:1px solid #334155; margin-bottom:16px; padding:0 12px;
+    }
+    .input-icon { font-size:18px; margin-right:8px; }
+    .input-row input {
+      flex:1; background:transparent; border:none; outline:none;
+      color:white; padding:14px 0; font-size:15px;
+    }
+    .login-btn {
+      width:100%; padding:14px; border-radius:12px; border:none;
+      background:#38bdf8; color:#0f172a; font-size:16px;
+      font-weight:bold; cursor:pointer; margin-top:8px;
+      transition:opacity 0.2s;
+    }
+    .login-btn:hover { opacity:0.9; }
+    .error-msg { color:#ef4444; text-align:center; margin-bottom:12px; font-size:13px; min-height:20px; }
+
+    /* ─── MAIN PANEL ─── */
+    .main-panel { display:none; }
+
+    /* ─── TOP NAV ─── */
+    .topnav {
+      background:#1e293b; border-bottom:1px solid #334155;
+      padding:0 24px; display:flex; align-items:center;
+      justify-content:space-between; height:60px;
+      position:sticky; top:0; z-index:100;
+    }
+    .topnav-logo  { font-size:20px; font-weight:bold; color:#38bdf8; }
+    .topnav-sub   { font-size:12px; color:#64748b; margin-left:8px; }
+    .topnav-right { display:flex; align-items:center; gap:12px; }
+    .welcome-text { font-size:13px; color:#94a3b8; }
+    .logout-btn {
+      padding:8px 16px; border-radius:8px; border:1px solid #334155;
+      background:transparent; color:#ef4444; font-size:13px;
+      font-weight:bold; cursor:pointer;
+    }
+
+    /* ─── TAB NAV ─── */
+    .tabnav {
+      background:#0f172a; border-bottom:1px solid #334155;
+      padding:0 24px; display:flex; gap:4px; overflow-x:auto;
+    }
+    .tab-btn {
+      padding:14px 18px; border:none; background:transparent;
+      color:#64748b; font-size:14px; font-weight:bold;
+      cursor:pointer; border-bottom:3px solid transparent;
+      white-space:nowrap; transition:all 0.2s;
+    }
+    .tab-btn:hover  { color:#94a3b8; }
+    .tab-btn.active { color:#38bdf8; border-bottom-color:#38bdf8; }
+
+    /* ─── PAGES ─── */
+    .page        { display:none; padding:24px; max-width:1100px; margin:0 auto; }
+    .page.active { display:block; }
+    .page-title  { font-size:24px; font-weight:bold; color:#38bdf8; margin-bottom:6px; }
+    .page-sub    { font-size:14px; color:#64748b; margin-bottom:24px; }
+
+    /* ─── BUTTONS ─── */
+    .btn {
+      padding:12px 20px; border-radius:10px; border:none;
+      font-size:14px; font-weight:bold; cursor:pointer;
+      transition:opacity 0.2s; display:inline-flex;
+      align-items:center; gap:8px;
+    }
+    .btn:hover    { opacity:0.9; }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-blue    { background:#38bdf8; color:#0f172a; }
+    .btn-green   { background:#16a34a; color:white; }
+    .btn-red     { background:#dc2626; color:white; }
+    .btn-yellow  { background:#f59e0b; color:#0f172a; }
+    .btn-purple  { background:#a78bfa; color:#0f172a; }
+    .btn-teal    { background:#10b981; color:#0f172a; }
+    .btn-outline { background:#1e293b; color:#38bdf8; border:1px solid #334155; }
+    .btn-row     { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+
+    /* ─── STATS ─── */
+    .stats-row {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+      gap:12px; margin-bottom:20px;
+    }
+    .stat-card {
+      background:#1e293b; border-radius:12px; padding:16px;
+      text-align:center; border:1px solid #334155;
+    }
+    .stat-val   { font-size:30px; font-weight:bold; }
+    .stat-label { font-size:11px; color:#64748b; margin-top:4px; }
+
+    /* ─── CARDS ─── */
+    .record-card {
+      background:#1e293b; border-radius:12px; padding:16px;
+      margin-bottom:12px; border:1px solid #334155;
+      display:flex; justify-content:space-between;
+      align-items:flex-start; flex-wrap:wrap; gap:8px;
+    }
+    .record-info h3 { color:#fff; font-size:15px; margin-bottom:4px; }
+    .record-info p  { color:#64748b; font-size:13px; margin-bottom:2px; }
+    .badges { display:flex; flex-direction:column; gap:4px; align-items:flex-end; }
+    .badge {
+      padding:3px 10px; border-radius:6px; font-size:11px;
+      font-weight:bold; white-space:nowrap;
+    }
+    .badge-qr     { background:#064e3b; color:#34d399; border:1px solid #10b981; }
+    .badge-manual { background:#1e3a5f; color:#93c5fd; border:1px solid #3b82f6; }
+    .badge-gps    { background:#14291a; color:#22c55e; border:1px solid #22c55e; }
+    .badge-nogps  { background:#1e293b; color:#64748b; border:1px solid #334155; }
+
+    /* ─── GPS SECTION ─── */
+    /* GPS status bar on QR page */
+    .gps-bar {
+      display:flex; align-items:center; justify-content:space-between;
+      background:#1e293b; border-radius:10px; padding:12px 16px;
+      border:1px solid #334155; margin-bottom:16px; max-width:500px;
+      flex-wrap:wrap; gap:8px;
+    }
+    .gps-bar-text { font-size:13px; font-weight:bold; }
+    .gps-coords   { font-size:11px; color:#64748b; font-family:monospace; }
+    /* GPS map link in records */
+    .gps-map-link {
+      color:#22c55e; font-size:12px;
+      text-decoration:none; font-weight:bold;
+    }
+    .gps-map-link:hover { text-decoration:underline; }
+    /* GPS accuracy indicator */
+    .gps-accuracy { font-size:11px; color:#64748b; }
+    /* GPS info box in dashboard */
+    .gps-info-box {
+      background:#14291a; border:1px solid #22c55e;
+      border-radius:10px; padding:12px 16px; margin-bottom:16px;
+      font-size:13px;
+    }
+    .gps-info-box h4 { color:#22c55e; margin-bottom:6px; font-size:14px; }
+    .gps-info-box p  { color:#94a3b8; line-height:1.6; }
+
+    /* ─── STUDENT CARDS ─── */
+    .student-card {
+      background:#1e293b; border-radius:12px; padding:16px;
+      margin-bottom:12px; border:1px solid #334155;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .student-info h3 { color:#fff; font-size:15px; margin-bottom:2px; }
+    .student-info p  { color:#64748b; font-size:12px; }
+    .mark-btn {
+      padding:10px 18px; border-radius:8px; border:none;
+      background:#16a34a; color:white; font-weight:bold;
+      font-size:13px; cursor:pointer; min-width:110px; transition:all 0.2s;
+    }
+    .mark-btn:disabled { background:#064e3b; color:#34d399; cursor:not-allowed; }
+    .mark-btn:hover:not(:disabled) { background:#15803d; }
+    .marked-card { border-color:#16a34a; background:#0d1f0d; }
+
+    /* ─── FORM INPUTS ─── */
+    .form-input {
+      width:100%; padding:12px 14px; border-radius:10px;
+      border:1px solid #334155; background:#0f172a;
+      color:white; font-size:14px; margin-bottom:12px;
+    }
+    .form-input:focus { outline:none; border-color:#38bdf8; }
+    .form-input::placeholder { color:#64748b; }
+    .form-select {
+      width:100%; padding:12px 14px; border-radius:10px;
+      border:1px solid #334155; background:#0f172a;
+      color:white; font-size:14px; margin-bottom:12px;
+    }
+    .form-label {
+      color:#94a3b8; font-size:13px; font-weight:bold;
+      margin-bottom:6px; display:block; margin-top:8px;
+    }
+
+    /* ─── QR DISPLAY ─── */
+    .qr-center    { display:flex; flex-direction:column; align-items:center; }
+    #qrcode       { background:white; padding:24px; border-radius:16px; margin-bottom:16px; }
+    .qr-code-text { color:#64748b; font-size:11px; margin-bottom:16px; text-align:center; word-break:break-all; max-width:350px; }
+    .timer-box    { font-size:14px; color:#94a3b8; margin-bottom:16px; }
+    .timer-box span { color:#38bdf8; font-weight:bold; font-size:18px; }
+    .scan-count-box {
+      background:#1e293b; border-radius:12px; padding:16px 32px;
+      margin-bottom:20px; text-align:center; border:1px solid #334155;
+    }
+    .scan-count-box h3 { color:#94a3b8; font-size:13px; margin-bottom:4px; }
+    .scan-count-box p  { color:#38bdf8; font-size:36px; font-weight:bold; }
+
+    /* ─── PERCENTAGE BARS ─── */
+    .percent-card {
+      background:#1e293b; border-radius:12px; padding:16px;
+      margin-bottom:12px; border:1px solid #334155;
+    }
+    .percent-header  { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .percent-subject { color:#fff; font-size:15px; font-weight:bold; }
+    .percent-value   { font-size:18px; font-weight:bold; }
+    .progress-bg     { height:10px; background:#334155; border-radius:5px; margin-bottom:8px; overflow:hidden; }
+    .progress-fill   { height:10px; border-radius:5px; transition:width 0.5s ease; }
+    .percent-detail  { color:#64748b; font-size:12px; }
+    .percent-status  { font-size:12px; font-weight:bold; margin-top:4px; }
+
+    /* ─── SCHEDULE CARDS ─── */
+    .schedule-card {
+      background:#1e293b; border-radius:12px; padding:16px;
+      margin-bottom:12px; border:1px solid #334155; border-left-width:4px;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .schedule-info h3 { color:#fff; font-size:16px; margin-bottom:4px; }
+    .schedule-info p  { color:#64748b; font-size:13px; margin-bottom:2px; }
+    .delete-btn { background:transparent; border:none; font-size:20px; cursor:pointer; padding:4px; }
+    .day-row    { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .day-btn {
+      padding:8px 14px; border-radius:8px; border:1px solid #334155;
+      background:#1e293b; color:#94a3b8; font-size:13px;
+      font-weight:bold; cursor:pointer; transition:all 0.2s; text-align:center;
+    }
+    .day-btn.active { background:#38bdf8; color:#0f172a; border-color:#38bdf8; }
+    .day-btn.today  { border-color:#f59e0b; }
+    .today-dot { width:6px; height:6px; border-radius:50%; background:#f59e0b; margin:2px auto 0; }
+
+    /* ─── PROFILE ─── */
+    .profile-box    { display:flex; flex-direction:column; align-items:center; margin-bottom:24px; }
+    .profile-avatar {
+      width:100px; height:100px; border-radius:50%;
+      background:#1e293b; border:3px solid #38bdf8;
+      display:flex; align-items:center; justify-content:center;
+      font-size:48px; margin-bottom:12px; overflow:hidden;
+    }
+    .profile-avatar img { width:100%; height:100%; object-fit:cover; }
+    .profile-name { font-size:20px; font-weight:bold; color:#fff; }
+    .profile-role { font-size:13px; color:#38bdf8; margin-top:4px; }
+    .profile-sub  { font-size:13px; color:#f59e0b; margin-top:2px; }
+
+    /* ─── MODAL ─── */
+    .modal-overlay {
+      display:none; position:fixed; top:0; left:0;
+      width:100%; height:100%; background:rgba(0,0,0,0.75);
+      z-index:200; justify-content:center; align-items:flex-end;
+    }
+    .modal-overlay.active { display:flex; }
+    .modal-box {
+      background:#1e293b; border-radius:20px 20px 0 0; padding:24px;
+      width:100%; max-width:600px; max-height:85vh; overflow-y:auto;
+    }
+    .modal-title { font-size:20px; font-weight:bold; color:#38bdf8; margin-bottom:20px; text-align:center; }
+    .modal-close { float:right; background:transparent; border:none; color:#ef4444; font-size:20px; cursor:pointer; }
+
+    /* ─── GPS MAP MODAL ─── */
+    .map-modal-overlay {
+      display:none; position:fixed; top:0; left:0;
+      width:100%; height:100%; background:rgba(0,0,0,0.85);
+      z-index:300; justify-content:center; align-items:center; padding:24px;
+    }
+    .map-modal-overlay.active { display:flex; }
+    .map-modal-box {
+      background:#1e293b; border-radius:16px; padding:24px;
+      width:100%; max-width:700px; border:1px solid #334155;
+    }
+    .map-modal-header {
+      display:flex; justify-content:space-between;
+      align-items:center; margin-bottom:16px;
+    }
+    .map-modal-title { font-size:18px; font-weight:bold; color:#38bdf8; }
+    /* Embedded map iframe */
+    .map-iframe {
+      width:100%; height:350px; border-radius:12px;
+      border:1px solid #334155;
+    }
+    .map-coords-row {
+      display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;
+    }
+    .map-coord-box {
+      background:#0f172a; border-radius:8px; padding:8px 14px;
+      border:1px solid #334155; font-family:monospace; font-size:13px;
+      color:#22c55e;
+    }
+
+    /* ─── DIVIDER ─── */
+    .divider { height:1px; background:#334155; margin:20px 0; }
+
+    /* ─── EMPTY STATE ─── */
+    .empty-state { color:#64748b; text-align:center; padding:40px 0; font-size:16px; }
+
+    /* ─── RESPONSIVE ─── */
+    @media(max-width:600px) {
+      .page { padding:16px; }
+      .topnav { padding:0 16px; }
+      .topnav-sub { display:none; }
+      .record-card { flex-direction:column; }
+      .badges { flex-direction:row; align-items:center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     LOGIN SECTION
+══════════════════════════════════════ -->
+<div id="loginSection" class="login-page">
+  <div class="login-logo">📋</div>
+  <h1 class="login-title">Smart Attendance</h1>
+  <p class="login-sub">Instructor Web Panel</p>
+
+  <div class="login-box">
+    <h2>Welcome Back</h2>
+    <p>Sign in to manage your classroom</p>
+
+    <!-- Error message if login fails -->
+    <p id="errorMsg" class="error-msg"></p>
+
+    <!-- Email input with icon -->
+    <label class="field-label">Email Address</label>
+    <div class="input-row">
+      <span class="input-icon">📧</span>
+      <input type="email" id="email" placeholder="Enter your email" />
+    </div>
+
+    <!-- Password input with icon -->
+    <label class="field-label">Password</label>
+    <div class="input-row">
+      <span class="input-icon">🔒</span>
+      <input type="password" id="password" placeholder="Enter your password" />
+    </div>
+
+    <button class="login-btn" onclick="handleLogin()">Login →</button>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     MAIN PANEL — shown after login
+══════════════════════════════════════ -->
+<div id="mainPanel" class="main-panel">
+
+  <!-- ── TOP NAVIGATION BAR ── -->
+  <nav class="topnav">
+    <div style="display:flex; align-items:center;">
+      <span class="topnav-logo">📋 Smart Attendance</span>
+      <span class="topnav-sub">Instructor Web Panel</span>
+    </div>
+    <div class="topnav-right">
+      <!-- Shows instructor name and subject -->
+      <span class="welcome-text" id="welcomeText"></span>
+      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- ── TAB NAVIGATION ── -->
+  <nav class="tabnav">
+    <button class="tab-btn active" onclick="switchTab('qr')">📱 QR Display</button>
+    <button class="tab-btn" onclick="switchTab('manual')">✏️ Manual Attendance</button>
+    <button class="tab-btn" onclick="switchTab('dashboard')">👨‍🏫 Dashboard</button>
+    <button class="tab-btn" onclick="switchTab('percentage')">📊 Attendance %</button>
+    <button class="tab-btn" onclick="switchTab('gpsmap')">🗺️ GPS Map</button>
+    <button class="tab-btn" onclick="switchTab('schedule')">📅 Schedule</button>
+    <button class="tab-btn" onclick="switchTab('profile')">👤 Profile</button>
+  </nav>
+
+
+  <!-- ══════════════════════════════════
+       TAB 1 — QR DISPLAY
+       Main screen for projector display
+  ══════════════════════════════════ -->
+  <div id="qrPage" class="page active">
+    <h1 class="page-title">📱 QR Code Display</h1>
+    <p class="page-sub" id="qrSubjectLabel"></p>
+
+    <!-- ── CLASSROOM GPS SECTION ── -->
+    <!-- Instructor can set classroom location here -->
+    <div style="max-width:500px; margin-bottom:16px;">
+
+      <!-- GPS status bar — shows if location is set or not -->
+      <div class="gps-bar" id="gpsStatusBar">
+        <span class="gps-bar-text" id="gpsStatusText" style="color:#64748b;">
+          📍 Classroom GPS not set
+        </span>
+        <button class="btn btn-teal" onclick="setClassroomGPS()" id="gpsBtn" style="padding:8px 14px; font-size:13px;">
+          📍 Set My Location
+        </button>
+      </div>
+
+      <!-- Shows GPS coordinates after they are set -->
+      <div id="gpsCoordsBox" style="display:none; background:#14291a; border:1px solid #22c55e; border-radius:10px; padding:12px 16px; margin-bottom:12px;">
+        <p style="color:#22c55e; font-size:13px; font-weight:bold; margin-bottom:4px;">✅ Classroom Location Set</p>
+        <p class="gps-coords" id="gpsCoordText"></p>
+        <p class="gps-accuracy" id="gpsAccuracyText"></p>
+        <!-- Link to view classroom location on Google Maps -->
+        <a id="classroomMapLink" href="#" target="_blank" class="gps-map-link" style="margin-top:6px; display:inline-block;">
+          🗺️ View on Google Maps
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Room number input -->
+    <div style="max-width:500px; margin-bottom:16px;">
+      <label class="form-label">🏫 Room Number (optional)</label>
+      <input class="form-input" type="text" id="roomInput" placeholder="e.g. Room 101" style="margin-bottom:0;" />
+    </div>
+
+    <!-- Scan counter — how many students have scanned -->
+    <div class="scan-count-box" style="max-width:300px;">
+      <h3>Students Scanned</h3>
+      <p id="scanCount">0</p>
+    </div>
+
+    <!-- QR code renders here -->
+    <div class="qr-center">
+      <div id="qrcode"></div>
+      <!-- Raw QR code value shown below image -->
+      <p class="qr-code-text" id="qrText"></p>
+      <!-- Auto-refresh countdown timer -->
+      <div class="timer-box">Auto refresh in <span id="countdown">60</span>s</div>
+
+      <!-- Action buttons -->
+      <div class="btn-row" style="justify-content:center;">
+        <button class="btn btn-blue" onclick="generateQR()">🔄 Generate New QR</button>
+        <button class="btn btn-outline" onclick="switchTab('manual')">✏️ Manual Attendance</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════
+       TAB 2 — MANUAL ATTENDANCE
+       Mark students present without QR
+  ══════════════════════════════════ -->
+  <div id="manualPage" class="page">
+    <h1 class="page-title">✏️ Manual Attendance</h1>
+    <p class="page-sub" id="manualSubjectLabel"></p>
+
+    <!-- Info box explaining when to use manual attendance -->
+    <div style="background:#1a2a1a; border:1px solid #16a34a; border-radius:10px; padding:12px 16px; margin-bottom:20px; font-size:13px;">
+      <p style="color:#22c55e; font-weight:bold; margin-bottom:4px;">ℹ️ When to use Manual Attendance</p>
+      <p style="color:#94a3b8;">Use this when a student forgot their phone, has no WiFi, or cannot scan the QR code for any reason.</p>
+    </div>
+
+    <!-- Search box to find students quickly -->
+    <input
+      class="form-input"
+      type="text"
+      id="searchInput"
+      placeholder="🔍 Search student by name or email..."
+      oninput="filterStudents()"
+      style="max-width:500px;"
+    />
+
+    <!-- Student list renders here -->
+    <div id="studentsList">
+      <p class="empty-state">Loading students...</p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════
+       TAB 3 — DASHBOARD
+       All attendance records + export
+  ══════════════════════════════════ -->
+  <div id="dashboardPage" class="page">
+    <h1 class="page-title">👨‍🏫 Attendance Dashboard</h1>
+    <p class="page-sub">All attendance records from all sessions</p>
+
+    <!-- Stats summary cards -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-val" id="statTotal" style="color:#38bdf8;">0</div>
+        <div class="stat-label">Total Records</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="statStudents" style="color:#10b981;">0</div>
+        <div class="stat-label">Unique Students</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="statManual" style="color:#f59e0b;">0</div>
+        <div class="stat-label">Manual Marks</div>
+      </div>
+      <div class="stat-card">
+        <!-- GPS recorded count — how many scans included GPS -->
+        <div class="stat-val" id="statGPS" style="color:#22c55e;">0</div>
+        <div class="stat-label">📍 GPS Recorded</div>
+      </div>
+      <div class="stat-card">
+        <!-- No GPS count — scans without location -->
+        <div class="stat-val" id="statNoGPS" style="color:#64748b;">0</div>
+        <div class="stat-label">No GPS</div>
+      </div>
+    </div>
+
+    <!-- GPS info explanation box -->
+    <div class="gps-info-box">
+      <h4>📍 About GPS Data</h4>
+      <p>
+        When students scan the QR code, the app tries to record their GPS coordinates automatically.
+        GPS is <strong style="color:#22c55e;">never required</strong> — attendance is always recorded even
+        without it. Green 📍 badges show which scans included location data.
+        Click <strong style="color:#22c55e;">🗺️ View on Map</strong> to see where a student was when they scanned.
+      </p>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="exportExcel()" id="exportBtn">📤 Export to Excel</button>
+      <button class="btn btn-teal"  onclick="switchTab('gpsmap')">🗺️ View GPS Map</button>
+      <button class="btn btn-outline" onclick="loadRecords()">🔄 Refresh</button>
+    </div>
+
+    <!-- Filter records by search -->
+    <input
+      class="form-input"
+      type="text"
+      id="dashboardSearch"
+      placeholder="🔍 Filter by student name or subject..."
+      oninput="filterRecords()"
+      style="max-width:500px; margin-bottom:16px;"
+    />
+
+    <!-- Records list renders here -->
+    <div id="recordsList">
+      <p class="empty-state">Loading records...</p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════
+       TAB 4 — ATTENDANCE PERCENTAGE
+       Shows % per student per subject
+  ══════════════════════════════════ -->
+  <div id="percentagePage" class="page">
+    <h1 class="page-title">📊 Attendance Percentage</h1>
+    <p class="page-sub">Overall attendance rates per student per subject</p>
+
+    <!-- Status legend -->
+    <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px; background:#1e293b; padding:12px 16px; border-radius:10px; border:1px solid #334155;">
+      <span style="color:#22c55e; font-weight:bold; font-size:13px;">✅ 75%+ Good Standing</span>
+      <span style="color:#94a3b8;">|</span>
+      <span style="color:#f59e0b; font-weight:bold; font-size:13px;">⚠️ 50–74% At Risk</span>
+      <span style="color:#94a3b8;">|</span>
+      <span style="color:#ef4444; font-weight:bold; font-size:13px;">❌ Below 50% Poor Attendance</span>
+    </div>
+
+    <!-- Filter by student name -->
+    <input
+      class="form-input"
+      type="text"
+      id="percentFilterInput"
+      placeholder="🔍 Filter by student name..."
+      oninput="filterPercentage()"
+      style="max-width:400px;"
+    />
+
+    <!-- Percentage cards render here -->
+    <div id="percentageList">
+      <p class="empty-state">Loading percentage data...</p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════
+       TAB 5 — GPS MAP
+       Shows where students scanned from
+  ══════════════════════════════════ -->
+  <div id="gpsmapPage" class="page">
+    <h1 class="page-title">🗺️ GPS Attendance Map</h1>
+    <p class="page-sub">See where students were when they scanned their attendance</p>
+
+    <!-- GPS summary stats -->
+    <div class="stats-row" style="margin-bottom:20px;">
+      <div class="stat-card">
+        <div class="stat-val" id="mapStatTotal" style="color:#22c55e;">0</div>
+        <div class="stat-label">📍 Scans with GPS</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="mapStatNo" style="color:#64748b;">0</div>
+        <div class="stat-label">No GPS Data</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="mapStatStudents" style="color:#38bdf8;">0</div>
+        <div class="stat-label">Students Tracked</div>
+      </div>
+    </div>
+
+    <!-- How GPS works explanation -->
+    <div class="gps-info-box" style="margin-bottom:20px;">
+      <h4>📍 How GPS Recording Works</h4>
+      <p>
+        When a student scans the QR code on their phone, the app silently captures their GPS
+        coordinates in the background. This does <strong style="color:#22c55e;">NOT</strong> block
+        or delay attendance — it simply records location data alongside the scan for your reference.
+        Students without GPS enabled still have their attendance recorded normally.
+      </p>
+    </div>
+
+    <!-- Filter GPS records -->
+    <input
+      class="form-input"
+      type="text"
+      id="gpsSearch"
+      placeholder="🔍 Filter by student name or subject..."
+      oninput="filterGPS()"
+      style="max-width:500px; margin-bottom:16px;"
+    />
+
+    <!-- GPS records list — shows all scans with location data -->
+    <div id="gpsRecordsList">
+      <p class="empty-state">Loading GPS data...</p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════
+       TAB 6 — CLASS SCHEDULE
+       Manage class timetable
+  ══════════════════════════════════ -->
+  <div id="schedulePage" class="page">
+    <h1 class="page-title">📅 Class Schedule</h1>
+    <p class="page-sub">Manage your class timetable — students can see all schedules in the app</p>
+
+    <!-- Day filter buttons -->
+    <div class="day-row" id="dayRow"></div>
+
+    <!-- Action buttons -->
+    <div class="btn-row">
+      <button class="btn btn-green"  onclick="openScheduleModal()">+ Add Class</button>
+      <button class="btn btn-outline" onclick="loadSchedule()">🔄 Refresh</button>
+    </div>
+
+    <!-- Schedule cards render here -->
+    <div id="scheduleList">
+      <p class="empty-state">Loading schedule...</p>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════
+       TAB 7 — PROFILE
+       Instructor account info
+  ══════════════════════════════════ -->
+  <div id="profilePage" class="page">
+    <h1 class="page-title">👤 My Profile</h1>
+    <p class="page-sub">Your instructor account information</p>
+
+    <!-- Profile photo and name -->
+    <div class="profile-box">
+      <div class="profile-avatar" id="profileAvatar">👤</div>
+      <div class="profile-name"   id="profileName">—</div>
+      <div class="profile-role"   id="profileRole">—</div>
+      <div class="profile-sub"    id="profileSubject"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Editable profile fields -->
+    <div style="max-width:500px; margin:0 auto;">
+      <label class="form-label">📧 Email Address</label>
+      <div style="background:#0f172a; border:1px solid #334155; border-radius:10px; padding:14px; margin-bottom:16px; color:#64748b; font-size:14px;" id="profileEmail">—</div>
+
+      <label class="form-label">👤 Full Name</label>
+      <input class="form-input" type="text" id="profileNameInput" placeholder="Enter your name" />
+
+      <label class="form-label">📚 Your Subject</label>
+      <div style="background:#0f172a; border:1px solid #334155; border-radius:10px; padding:14px; margin-bottom:20px; color:#f59e0b; font-size:14px;" id="profileSubjectDisplay">—</div>
+
+      <button class="btn btn-blue" style="width:100%; justify-content:center;" onclick="saveProfile()">
+        💾 Save Changes
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Account activity stats -->
+    <div class="stats-row" style="max-width:500px; margin:0 auto;">
+      <div class="stat-card">
+        <div class="stat-val" id="profileSessions" style="color:#38bdf8;">—</div>
+        <div class="stat-label">Sessions Created</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="profileStudentsCount" style="color:#10b981;">—</div>
+        <div class="stat-label">Students Marked</div>
+      </div>
+      <div class="stat-card">
+        <!-- How many of their records have GPS -->
+        <div class="stat-val" id="profileGPSCount" style="color:#22c55e;">—</div>
+        <div class="stat-label">GPS Recorded</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end main-panel -->
+
+
+<!-- ══════════════════════════════════
+     ADD SCHEDULE MODAL
+══════════════════════════════════ -->
+<div id="scheduleModal" class="modal-overlay">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeScheduleModal()">✕</button>
+    <h2 class="modal-title">Add New Class</h2>
+
+    <label class="form-label">Subject Name</label>
+    <input class="form-input" type="text" id="newSubject" placeholder="e.g. Mathematics" />
+
+    <label class="form-label">Room Number (optional)</label>
+    <input class="form-input" type="text" id="newRoom" placeholder="e.g. Room 101" />
+
+    <label class="form-label">Day of Week</label>
+    <select class="form-select" id="newDay">
+      <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+      <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+    </select>
+
+    <label class="form-label">Start Time</label>
+    <select class="form-select" id="newStartTime"></select>
+
+    <label class="form-label">End Time</label>
+    <select class="form-select" id="newEndTime"></select>
+
+    <!-- GPS for classroom location -->
+    <label class="form-label">📍 Classroom GPS (optional)</label>
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <button class="btn btn-teal" onclick="setScheduleGPS()" style="flex:1; justify-content:center;">
+        📍 Use My Current Location
+      </button>
+    </div>
+    <!-- Shows coordinates after GPS is set -->
+    <div id="scheduleGPSResult" style="display:none; background:#14291a; border:1px solid #22c55e; border-radius:8px; padding:10px; margin-bottom:12px; font-size:12px; color:#22c55e;">
+    </div>
+
+    <button class="btn btn-blue" style="width:100%; justify-content:center; margin-top:8px;" onclick="addSchedule()">
+      💾 Save Class
+    </button>
+    <button class="btn btn-outline" style="width:100%; justify-content:center; margin-top:8px;" onclick="closeScheduleModal()">
+      Cancel
+    </button>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════
+     GPS MAP MODAL
+     Shows individual student location
+══════════════════════════════════ -->
+<div id="mapModal" class="map-modal-overlay">
+  <div class="map-modal-box">
+    <div class="map-modal-header">
+      <span class="map-modal-title" id="mapModalTitle">📍 Student Location</span>
+      <button onclick="closeMapModal()" style="background:transparent; border:none; color:#ef4444; font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <!-- Google Maps embed iframe -->
+    <iframe id="mapIframe" class="map-iframe" src="" frameborder="0" allowfullscreen="" loading="lazy"></iframe>
+    <!-- Coordinate display -->
+    <div class="map-coords-row">
+      <div class="map-coord-box">🌐 Lat: <span id="mapLat">—</span></div>
+      <div class="map-coord-box">🌐 Lon: <span id="mapLon">—</span></div>
+    </div>
+    <!-- Link to open in Google Maps -->
+    <a id="mapGoogleLink" href="#" target="_blank" class="btn btn-teal" style="display:inline-flex; margin-top:12px; text-decoration:none;">
+      🗺️ Open in Google Maps
+    </a>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════
+     JAVASCRIPT — ALL APP LOGIC
+══════════════════════════════════ -->
+<script>
+
+// ─── CONFIGURATION ───
+// Change this to your backend URL
+// Local:    http://localhost:5000/api
+// Railway:  https://your-app.up.railway.app/api
+const API = 'http://localhost:5000/api';
+
+// ─── APP STATE ───
+let token           = null;    // JWT token after login
+let currentUser     = null;    // Instructor info object
+let currentQR       = null;    // Current QR code string
+let userSubject     = 'General'; // Instructor's subject
+let countdownInt    = null;    // QR countdown timer
+let scanCountInt    = null;    // Scan count refresh interval
+let allStudents     = [];      // All students from DB
+let allRecords      = [];      // All attendance records
+let allPercent      = [];      // Attendance percentage data
+let allSchedules    = [];      // Schedule entries
+let selectedDay     = 'Monday'; // Active day in schedule
+// GPS state for QR page
+let classroomLat    = null;    // Instructor set classroom lat
+let classroomLon    = null;    // Instructor set classroom lon
+// GPS state for schedule modal
+let scheduleGPSLat  = null;
+let scheduleGPSLon  = null;
+
+// ─── CONSTANTS ───
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const TIME_SLOTS = [
+  '07:00','07:30','08:00','08:30','09:00','09:30',
+  '10:00','10:30','11:00','11:30','12:00','12:30',
+  '13:00','13:30','14:00','14:30','15:00','15:30',
+  '16:00','16:30','17:00','17:30','18:00','18:30',
+  '19:00','19:30','20:00'
+];
+// Unique color for each day in schedule
+const DAY_COLORS = {
+  Monday:'#3b82f6', Tuesday:'#8b5cf6', Wednesday:'#ec4899',
+  Thursday:'#f59e0b', Friday:'#10b981', Saturday:'#ef4444', Sunday:'#64748b'
+};
+
+// ─────────────────────────────────────────
+// LOGIN
+// ─────────────────────────────────────────
+async function handleLogin() {
+  const email    = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const errorMsg = document.getElementById('errorMsg');
+
+  if (!email || !password) {
+    errorMsg.textContent = 'Please fill in all fields';
+    return;
+  }
+
+  try {
+    const res  = await fetch(`${API}/auth/login`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok) { errorMsg.textContent = data.error || 'Login failed'; return; }
+    // Only instructors can access this panel
+    if (data.user.role !== 'instructor') {
+      errorMsg.textContent = 'Only instructors can access this panel'; return;
+    }
+
+    // Save session
+    token       = data.token;
+    currentUser = data.user;
+    userSubject = data.user.subject || 'General';
+
+    // Update UI labels
+    document.getElementById('welcomeText').textContent      = `${data.user.name}  |  📚 ${userSubject}`;
+    document.getElementById('qrSubjectLabel').textContent   = `Subject: ${userSubject}`;
+    document.getElementById('manualSubjectLabel').textContent = `Subject: ${userSubject}`;
+
+    // Show main panel
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('mainPanel').style.display    = 'block';
+
+    // Initialize everything
+    generateQR();
+    populateTimeSlots();
+    buildDayButtons();
+    loadStudents();
+    loadRecords();
+    loadSchedule();
+    loadPercentage();
+    loadProfile();
+    startScanCountRefresh();
+
+  } catch (err) {
+    errorMsg.textContent = 'Server error. Make sure backend is running.';
+  }
+}
+
+// ─────────────────────────────────────────
+// LOGOUT
+// ─────────────────────────────────────────
+function handleLogout() {
+  token = null; currentUser = null; currentQR = null;
+  classroomLat = null; classroomLon = null;
+  clearInterval(countdownInt);
+  clearInterval(scanCountInt);
+  document.getElementById('loginSection').style.display = 'flex';
+  document.getElementById('mainPanel').style.display    = 'none';
+  document.getElementById('email').value    = '';
+  document.getElementById('password').value = '';
+  document.getElementById('errorMsg').textContent = '';
+}
+
+// ─────────────────────────────────────────
+// TAB SWITCHING
+// ─────────────────────────────────────────
+function switchTab(tab) {
+  const tabs = ['qr','manual','dashboard','percentage','gpsmap','schedule','profile'];
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(tab + 'Page').classList.add('active');
+}
+
+// ─────────────────────────────────────────
+// SET CLASSROOM GPS LOCATION
+// Uses browser Geolocation API to get instructor's current position
+// This sets the classroom reference point
+// ─────────────────────────────────────────
+function setClassroomGPS() {
+  const btn = document.getElementById('gpsBtn');
+
+  // Check if browser supports geolocation
+  if (!navigator.geolocation) {
+    alert('❌ Geolocation is not supported by your browser');
+    return;
+  }
+
+  // Update button to show loading state
+  btn.textContent = '⏳ Getting location...';
+  btn.disabled    = true;
+
+  // Request current position from browser
+  navigator.geolocation.getCurrentPosition(
+    // ── Success callback ──
+    (position) => {
+      classroomLat = position.coords.latitude;
+      classroomLon = position.coords.longitude;
+      const accuracy = Math.round(position.coords.accuracy);
+
+      // Update GPS status bar to show success
+      document.getElementById('gpsStatusText').textContent  = '✅ Classroom GPS Set';
+      document.getElementById('gpsStatusText').style.color  = '#22c55e';
+      document.getElementById('gpsCoordsBox').style.display = 'block';
+      document.getElementById('gpsCoordText').textContent   =
+        `Lat: ${classroomLat.toFixed(6)}  |  Lon: ${classroomLon.toFixed(6)}`;
+      document.getElementById('gpsAccuracyText').textContent =
+        `Accuracy: ±${accuracy} meters`;
+
+      // Set Google Maps link for classroom location
+      const mapsUrl = `https://maps.google.com?q=${classroomLat},${classroomLon}`;
+      document.getElementById('classroomMapLink').href = mapsUrl;
+
+      // Update button
+      btn.textContent = '📍 Update Location';
+      btn.disabled    = false;
+    },
+    // ── Error callback ──
+    (error) => {
+      let msg = 'Could not get location';
+      if (error.code === 1) msg = 'Location permission denied. Please allow location access.';
+      if (error.code === 2) msg = 'Location unavailable. Check GPS settings.';
+      if (error.code === 3) msg = 'Location request timed out. Try again.';
+      alert('❌ ' + msg);
+      btn.textContent = '📍 Set My Location';
+      btn.disabled    = false;
+    },
+    // ── Options: high accuracy, 10 second timeout ──
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
+// ─────────────────────────────────────────
+// SET GPS FOR SCHEDULE MODAL
+// Gets GPS for a specific class location
+// ─────────────────────────────────────────
+function setScheduleGPS() {
+  if (!navigator.geolocation) {
+    alert('❌ Geolocation not supported');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      scheduleGPSLat = position.coords.latitude;
+      scheduleGPSLon = position.coords.longitude;
+      const accuracy = Math.round(position.coords.accuracy);
+
+      // Show result in modal
+      const box = document.getElementById('scheduleGPSResult');
+      box.style.display   = 'block';
+      box.innerHTML = `
+        ✅ Location captured<br>
+        Lat: ${scheduleGPSLat.toFixed(6)}  |  Lon: ${scheduleGPSLon.toFixed(6)}<br>
+        Accuracy: ±${accuracy}m
+      `;
+    },
+    (error) => {
+      alert('❌ Could not get location: ' + error.message);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
+// ─────────────────────────────────────────
+// QR CODE GENERATION
+// Creates unique QR with subject, room, GPS, timestamp
+// ─────────────────────────────────────────
+function generateQR() {
+  const room = document.getElementById('roomInput').value.trim();
+
+  // Format: ATT-Subject-Room-Timestamp or ATT-Subject-Timestamp
+  currentQR = room
+    ? `ATT-${userSubject}-${room}-${Date.now()}`
+    : `ATT-${userSubject}-${Date.now()}`;
+
+  document.getElementById('qrText').textContent        = currentQR;
+  document.getElementById('qrcode').innerHTML          = '';
+  document.getElementById('scanCount').textContent     = '0';
+
+  // Generate QR code image
+  new QRCode(document.getElementById('qrcode'), {
+    text: currentQR, width: 280, height: 280,
+    colorDark: '#0f172a', colorLight: '#ffffff',
+  });
+
+  resetCountdown();
+}
+
+// ─── COUNTDOWN TIMER ───
+// Auto-generates new QR every 60 seconds
+function resetCountdown() {
+  clearInterval(countdownInt);
+  let seconds = 60;
+  document.getElementById('countdown').textContent = seconds;
+  countdownInt = setInterval(() => {
+    seconds--;
+    document.getElementById('countdown').textContent = seconds;
+    if (seconds <= 0) { clearInterval(countdownInt); generateQR(); }
+  }, 1000);
+}
+
+// ─── SCAN COUNT AUTO-REFRESH ───
+// Checks every 5 seconds how many students scanned
+async function startScanCountRefresh() {
+  await updateScanCount();
+  scanCountInt = setInterval(updateScanCount, 5000);
+}
+async function updateScanCount() {
+  if (!currentQR || !token) return;
+  try {
+    const res  = await fetch(`${API}/attendance/scan-count?qr_code=${encodeURIComponent(currentQR)}`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    document.getElementById('scanCount').textContent = data.count || 0;
+  } catch (e) { console.log('Scan count error:', e); }
+}
+
+// ─────────────────────────────────────────
+// MANUAL ATTENDANCE — LOAD STUDENTS
+// ─────────────────────────────────────────
+async function loadStudents() {
+  try {
+    const res   = await fetch(`${API}/attendance/students`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    allStudents = await res.json();
+    renderStudents(allStudents);
+  } catch (e) { console.log('Load students error:', e); }
+}
+
+function filterStudents() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  renderStudents(allStudents.filter(s =>
+    s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q)
+  ));
+}
+
+function renderStudents(students) {
+  const list = document.getElementById('studentsList');
+  if (!students.length) { list.innerHTML = '<p class="empty-state">No students found</p>'; return; }
+  list.innerHTML = students.map(s => `
+    <div class="student-card" id="sc-${s.id}">
+      <div class="student-info">
+        <h3>👤 ${s.name}</h3>
+        <p>${s.email}</p>
+      </div>
+      <button class="mark-btn" id="mb-${s.id}" onclick="markAttendance(${s.id},'${s.name}',this)">
+        ✅ Mark Present
+      </button>
+    </div>
+  `).join('');
+}
+
+async function markAttendance(id, name, btn) {
+  btn.disabled = true; btn.textContent = 'Marking...';
+  try {
+    const res  = await fetch(`${API}/attendance/manual`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
+      body: JSON.stringify({ student_id:id, subject:userSubject })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Failed');
+      btn.disabled = false; btn.textContent = '✅ Mark Present';
+    } else {
+      btn.textContent = '✅ Marked!';
+      document.getElementById(`sc-${id}`).classList.add('marked-card');
+      loadRecords(); // Refresh dashboard
+    }
+  } catch (e) {
+    alert('Server error');
+    btn.disabled = false; btn.textContent = '✅ Mark Present';
+  }
+}
+
+// ─────────────────────────────────────────
+// LOAD DASHBOARD RECORDS
+// Fetches all attendance including GPS data
+// ─────────────────────────────────────────
+async function loadRecords() {
+  try {
+    const res  = await fetch(`${API}/attendance/records`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    allRecords = await res.json();
+    renderRecords(allRecords);
+    renderGPSRecords(allRecords); // Also update GPS map tab
+    updateMapStats(allRecords);   // Update GPS map stats
+  } catch (e) { console.log('Load records error:', e); }
+}
+
+function filterRecords() {
+  const q = document.getElementById('dashboardSearch').value.toLowerCase();
+  renderRecords(allRecords.filter(r =>
+    r.name.toLowerCase().includes(q) ||
+    (r.subject && r.subject.toLowerCase().includes(q))
+  ));
+}
+
+// ─── RENDER RECORDS ───
+// Shows each attendance record with GPS badge and map link
+function renderRecords(records) {
+  // ── Update stat counters ──
+  document.getElementById('statTotal').textContent    = records.length;
+  document.getElementById('statStudents').textContent = new Set(records.map(r=>r.name)).size;
+  document.getElementById('statManual').textContent   = records.filter(r=>r.qr_code&&r.qr_code.startsWith('MANUAL')).length;
+
+  // Count records that have GPS coordinates
+  const withGPS    = records.filter(r => r.student_lat && r.student_lon);
+  const withoutGPS = records.filter(r => !r.student_lat || !r.student_lon);
+  document.getElementById('statGPS').textContent   = withGPS.length;
+  document.getElementById('statNoGPS').textContent = withoutGPS.length;
+
+  const list = document.getElementById('recordsList');
+  if (!records.length) { list.innerHTML = '<p class="empty-state">No records yet</p>'; return; }
+
+  list.innerHTML = records.map(r => {
+    const isManual = r.qr_code && r.qr_code.startsWith('MANUAL');
+    const hasGPS   = r.student_lat && r.student_lon;
+
+    // Build GPS section for this record
+    const gpsSection = hasGPS
+      ? `
+        <p style="margin-top:6px;">
+          <!-- Clickable link to open map modal with student location -->
+          <a href="javascript:void(0)"
+             onclick="openMapModal('${r.name}',${r.student_lat},${r.student_lon})"
+             class="gps-map-link">
+            🗺️ View on Map
+          </a>
+          <span style="color:#64748b; font-size:11px; margin-left:8px; font-family:monospace;">
+            (${parseFloat(r.student_lat).toFixed(5)}, ${parseFloat(r.student_lon).toFixed(5)})
+          </span>
+        </p>`
+      : `<p style="color:#334155; font-size:11px; margin-top:4px;">📍 No GPS data recorded</p>`;
+
+    return `
+      <div class="record-card">
+        <div class="record-info">
+          <h3>👤 ${r.name}</h3>
+          <p>📚 ${r.subject}${r.room ? `  •  🏫 ${r.room}` : ''}</p>
+          <p>🕐 ${formatDate(r.scanned_at)}</p>
+          ${gpsSection}
+        </div>
+        <div class="badges">
+          <!-- QR or Manual badge -->
+          <span class="badge ${isManual ? 'badge-manual' : 'badge-qr'}">
+            ${isManual ? '✏️ Manual' : '📱 QR Scan'}
+          </span>
+          <!-- GPS badge — green if has GPS, gray if not -->
+          <span class="badge ${hasGPS ? 'badge-gps' : 'badge-nogps'}">
+            ${hasGPS ? '📍 GPS ✅' : '📍 No GPS'}
+          </span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── EXPORT TO EXCEL ───
+async function exportExcel() {
+  const btn = document.getElementById('exportBtn');
+  btn.disabled = true; btn.textContent = '⏳ Exporting...';
+  try {
+    const res  = await fetch(`${API}/attendance/export`,
+      { headers: { Authorization:`Bearer ${token}` } });
+    const blob = await res.blob();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'attendance.xlsx'; a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (e) { alert('Export failed: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '📤 Export to Excel'; }
+}
+
+// ─────────────────────────────────────────
+// GPS MAP TAB
+// Shows all records that have GPS data
+// ─────────────────────────────────────────
+
+// ─── UPDATE MAP STATS ───
+function updateMapStats(records) {
+  const withGPS = records.filter(r => r.student_lat && r.student_lon);
+  document.getElementById('mapStatTotal').textContent    = withGPS.length;
+  document.getElementById('mapStatNo').textContent       = records.length - withGPS.length;
+  document.getElementById('mapStatStudents').textContent = new Set(withGPS.map(r=>r.name)).size;
+}
+
+// ─── FILTER GPS RECORDS ───
+function filterGPS() {
+  const q = document.getElementById('gpsSearch').value.toLowerCase();
+  renderGPSRecords(allRecords.filter(r =>
+    r.name.toLowerCase().includes(q) ||
+    (r.subject && r.subject.toLowerCase().includes(q))
+  ));
+}
+
+// ─── RENDER GPS RECORDS ───
+// Shows only records that have latitude/longitude
+function renderGPSRecords(records) {
+  // Filter to only records with GPS data
+  const withGPS = records.filter(r => r.student_lat && r.student_lon);
+  const list    = document.getElementById('gpsRecordsList');
+
+  if (!withGPS.length) {
+    list.innerHTML = `
+      <p class="empty-state">
+        No GPS data recorded yet.<br>
+        <span style="font-size:13px; color:#334155;">
+          GPS is captured when students scan the QR code on their phone.
+          Records without GPS are still valid attendance records.
+        </span>
+      </p>`;
+    return;
+  }
+
+  list.innerHTML = withGPS.map(r => `
+    <div class="record-card" style="border-color:#22c55e;">
+      <div class="record-info">
+        <h3>👤 ${r.name}</h3>
+        <p>📚 ${r.subject}${r.room ? `  •  🏫 ${r.room}` : ''}</p>
+        <p>🕐 ${formatDate(r.scanned_at)}</p>
+        <p style="margin-top:8px; font-family:monospace; font-size:11px; color:#22c55e;">
+          🌐 Lat: ${parseFloat(r.student_lat).toFixed(6)}
+          &nbsp;&nbsp;
+          Lon: ${parseFloat(r.student_lon).toFixed(6)}
+        </p>
+        <p style="margin-top:4px;">
+          <!-- Clickable button to open map modal -->
+          <a href="javascript:void(0)"
+             onclick="openMapModal('${r.name}',${r.student_lat},${r.student_lon})"
+             class="gps-map-link">
+            🗺️ View on Google Maps
+          </a>
+          &nbsp;&nbsp;
+          <!-- Direct Google Maps link in new tab -->
+          <a href="https://maps.google.com?q=${r.student_lat},${r.student_lon}"
+             target="_blank"
+             class="gps-map-link" style="color:#38bdf8;">
+            ↗ Open in new tab
+          </a>
+        </p>
+      </div>
+      <div class="badges">
+        <span class="badge badge-gps">📍 GPS ✅</span>
+        <span class="badge ${r.qr_code&&r.qr_code.startsWith('MANUAL') ? 'badge-manual' : 'badge-qr'}">
+          ${r.qr_code&&r.qr_code.startsWith('MANUAL') ? '✏️ Manual' : '📱 QR Scan'}
+        </span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── OPEN MAP MODAL ───
+// Shows embedded Google Maps with student's scan location
+function openMapModal(name, lat, lon) {
+  document.getElementById('mapModalTitle').textContent = `📍 ${name}'s Scan Location`;
+  document.getElementById('mapLat').textContent        = parseFloat(lat).toFixed(6);
+  document.getElementById('mapLon').textContent        = parseFloat(lon).toFixed(6);
+
+  // Set Google Maps embed URL
+  const embedUrl  = `https://maps.google.com/maps?q=${lat},${lon}&z=17&output=embed`;
+  document.getElementById('mapIframe').src     = embedUrl;
+
+  // Set direct Google Maps link
+  const googleUrl = `https://maps.google.com?q=${lat},${lon}`;
+  document.getElementById('mapGoogleLink').href = googleUrl;
+
+  // Show modal
+  document.getElementById('mapModal').classList.add('active');
+}
+
+function closeMapModal() {
+  document.getElementById('mapModal').classList.remove('active');
+  document.getElementById('mapIframe').src = ''; // Stop map loading
+}
+
+// ─────────────────────────────────────────
+// ATTENDANCE PERCENTAGE
+// Calculates % per student per subject
+// ─────────────────────────────────────────
+async function loadPercentage() {
+  try {
+    const res     = await fetch(`${API}/attendance/records`,
+      { headers: { Authorization:`Bearer ${token}` } });
+    const records = await res.json();
+
+    // Count unique sessions per subject (unique QR codes)
+    const subjectSessions = {};
+    records.forEach(r => {
+      if (!subjectSessions[r.subject]) subjectSessions[r.subject] = new Set();
+      subjectSessions[r.subject].add(r.qr_code);
+    });
+
+    // Count attendance per student per subject
+    const studentData = {};
+    records.forEach(r => {
+      if (!studentData[r.name]) studentData[r.name] = {};
+      if (!studentData[r.name][r.subject]) studentData[r.name][r.subject] = 0;
+      studentData[r.name][r.subject]++;
+    });
+
+    // Build percentage array
+    allPercent = [];
+    Object.keys(studentData).forEach(studentName => {
+      Object.keys(studentData[studentName]).forEach(subject => {
+        const attended = studentData[studentName][subject];
+        const total    = subjectSessions[subject] ? subjectSessions[subject].size : attended;
+        const pct      = Math.round((attended / total) * 100);
+        const status   = pct >= 75 ? 'good' : pct >= 50 ? 'warning' : 'danger';
+        allPercent.push({ studentName, subject, attended, total, pct, status });
+      });
+    });
+
+    renderPercentage(allPercent);
+  } catch (e) { console.log('Load percentage error:', e); }
+}
+
+function filterPercentage() {
+  const q = document.getElementById('percentFilterInput').value.toLowerCase();
+  renderPercentage(allPercent.filter(p => p.studentName.toLowerCase().includes(q)));
+}
+
+function renderPercentage(data) {
+  const list   = document.getElementById('percentageList');
+  const colors = { good:'#22c55e', warning:'#f59e0b', danger:'#ef4444' };
+  const labels = { good:'✅ Good Standing', warning:'⚠️ At Risk', danger:'❌ Poor Attendance' };
+
+  if (!data.length) { list.innerHTML = '<p class="empty-state">No attendance data yet</p>'; return; }
+
+  list.innerHTML = data.map(p => `
+    <div class="percent-card">
+      <div class="percent-header">
+        <div>
+          <div class="percent-subject">${p.subject}</div>
+          <div style="color:#64748b; font-size:12px; margin-top:2px;">👤 ${p.studentName}</div>
+        </div>
+        <div class="percent-value" style="color:${colors[p.status]};">${p.pct}%</div>
+      </div>
+      <!-- Progress bar width = attendance percentage -->
+      <div class="progress-bg">
+        <div class="progress-fill" style="width:${p.pct}%; background:${colors[p.status]};"></div>
+      </div>
+      <div class="percent-detail">${p.attended} of ${p.total} sessions attended</div>
+      <div class="percent-status" style="color:${colors[p.status]};">${labels[p.status]}</div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+// CLASS SCHEDULE
+// ─────────────────────────────────────────
+async function loadSchedule() {
+  try {
+    const res    = await fetch(`${API}/schedule`,
+      { headers: { Authorization:`Bearer ${token}` } });
+    allSchedules = await res.json();
+    renderSchedule();
+  } catch (e) { console.log('Load schedule error:', e); }
+}
+
+// ─── BUILD DAY BUTTONS ───
+function buildDayButtons() {
+  const today   = getTodayName();
+  selectedDay   = today; // Auto-select today
+  document.getElementById('dayRow').innerHTML = DAYS.map(day => `
+    <button
+      class="day-btn ${day===selectedDay?'active':''} ${day===today?'today':''}"
+      onclick="selectDay('${day}')"
+    >
+      ${day.substring(0,3)}
+      ${day===today?'<div class="today-dot"></div>':''}
+    </button>
+  `).join('');
+}
+
+function selectDay(day) {
+  selectedDay = day;
+  document.querySelectorAll('.day-btn').forEach((btn,i) => {
+    btn.classList.toggle('active', DAYS[i] === day);
+  });
+  renderSchedule();
+}
+
+// ─── RENDER SCHEDULE ───
+// Shows classes for selected day with GPS info if available
+function renderSchedule() {
+  const filtered = allSchedules.filter(s => s.day_of_week === selectedDay);
+  const list     = document.getElementById('scheduleList');
+
+  if (!filtered.length) {
+    list.innerHTML = `<p class="empty-state">No classes on ${selectedDay}</p>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(s => `
+    <div class="schedule-card" style="border-left-color:${DAY_COLORS[s.day_of_week]||'#38bdf8'};">
+      <div class="schedule-info">
+        <h3>${s.subject}</h3>
+        <p>🕐 ${s.start_time} — ${s.end_time}</p>
+        ${s.room ? `<p>🏫 ${s.room}</p>` : ''}
+        <!-- Show classroom GPS if it was set when adding the class -->
+        ${s.classroom_lat && s.classroom_lon
+          ? `<p style="margin-top:4px;">
+               <a href="https://maps.google.com?q=${s.classroom_lat},${s.classroom_lon}"
+                  target="_blank" class="gps-map-link">
+                 📍 Classroom GPS set — View on Maps
+               </a>
+             </p>`
+          : `<p style="color:#334155; font-size:11px; margin-top:4px;">📍 No classroom GPS set</p>`
+        }
+      </div>
+      <button class="delete-btn" onclick="deleteSchedule(${s.id})" title="Delete">🗑️</button>
+    </div>
+  `).join('');
+}
+
+// ─── SCHEDULE MODAL ───
+function openScheduleModal()  {
+  scheduleGPSLat = null; scheduleGPSLon = null;
+  document.getElementById('scheduleGPSResult').style.display = 'none';
+  document.getElementById('scheduleModal').classList.add('active');
+}
+function closeScheduleModal() {
+  document.getElementById('scheduleModal').classList.remove('active');
+}
+
+function populateTimeSlots() {
+  const s = document.getElementById('newStartTime');
+  const e = document.getElementById('newEndTime');
+  TIME_SLOTS.forEach(t => {
+    s.innerHTML += `<option>${t}</option>`;
+    e.innerHTML += `<option>${t}</option>`;
+  });
+  e.value = '10:00';
+}
+
+// ─── ADD SCHEDULE ───
+// Saves new class including optional GPS
+async function addSchedule() {
+  const subject = document.getElementById('newSubject').value.trim();
+  const room    = document.getElementById('newRoom').value.trim();
+  const day     = document.getElementById('newDay').value;
+  const start   = document.getElementById('newStartTime').value;
+  const end     = document.getElementById('newEndTime').value;
+
+  if (!subject) { alert('Please enter a subject name'); return; }
+
+  try {
+    const res = await fetch(`${API}/schedule`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
+      body: JSON.stringify({
+        subject, room:room||null, day_of_week:day,
+        start_time:start, end_time:end,
+        // Include GPS coordinates if instructor set them
+        classroom_lat: scheduleGPSLat || null,
+        classroom_lon: scheduleGPSLon || null
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error||'Failed'); return; }
+    alert('✅ Class added!');
+    closeScheduleModal();
+    document.getElementById('newSubject').value = '';
+    document.getElementById('newRoom').value    = '';
+    scheduleGPSLat = null; scheduleGPSLon = null;
+    loadSchedule();
+  } catch (e) { alert('Server error: ' + e.message); }
+}
+
+// ─── DELETE SCHEDULE ───
+async function deleteSchedule(id) {
+  if (!confirm('Delete this class?')) return;
+  try {
+    await fetch(`${API}/schedule/${id}`,
+      { method:'DELETE', headers:{ Authorization:`Bearer ${token}` } });
+    loadSchedule();
+  } catch (e) { alert('Failed: ' + e.message); }
+}
+
+// ─────────────────────────────────────────
+// PROFILE
+// ─────────────────────────────────────────
+async function loadProfile() {
+  try {
+    const res  = await fetch(`${API}/profile/me`,
+      { headers: { Authorization:`Bearer ${token}` } });
+    const data = await res.json();
+
+    document.getElementById('profileName').textContent           = data.name    || '—';
+    document.getElementById('profileRole').textContent           = '👨‍🏫 Instructor';
+    document.getElementById('profileSubject').textContent        = data.subject ? `📚 ${data.subject}` : '';
+    document.getElementById('profileEmail').textContent          = data.email   || '—';
+    document.getElementById('profileNameInput').value            = data.name    || '';
+    document.getElementById('profileSubjectDisplay').textContent = data.subject || '—';
+
+    // Show profile photo if instructor has uploaded one
+    if (data.photo) {
+      const base = API.replace('/api','');
+      document.getElementById('profileAvatar').innerHTML =
+        `<img src="${base}${data.photo}" alt="Profile" />`;
+    }
+
+    // Load stats from records
+    const recRes   = await fetch(`${API}/attendance/records`,
+      { headers: { Authorization:`Bearer ${token}` } });
+    const records  = await recRes.json();
+    document.getElementById('profileSessions').textContent      = new Set(records.map(r=>r.qr_code)).size;
+    document.getElementById('profileStudentsCount').textContent = new Set(records.map(r=>r.name)).size;
+    // Count GPS-recorded scans
+    document.getElementById('profileGPSCount').textContent      = records.filter(r=>r.student_lat&&r.student_lon).length;
+
+  } catch (e) { console.log('Load profile error:', e); }
+}
+
+async function saveProfile() {
+  const name = document.getElementById('profileNameInput').value.trim();
+  if (!name) { alert('Please enter your name'); return; }
+  try {
+    const res  = await fetch(`${API}/profile/update`, {
+      method:'PUT',
+      headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error||'Failed'); return; }
+    document.getElementById('profileName').textContent = name;
+    document.getElementById('welcomeText').textContent = `${name}  |  📚 ${userSubject}`;
+    alert('✅ Profile updated!');
+  } catch (e) { alert('Server error: ' + e.message); }
+}
+
+// ─────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────
+
+// Format MySQL timestamp to readable date string
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString() + '  ' + d.toLocaleTimeString();
+}
+
+// Get current day name e.g. 'Monday'
+function getTodayName() {
+  return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+}
+
+// Press Enter on login to submit
+document.addEventListener('keypress', e => {
+  if (e.key==='Enter' && document.getElementById('loginSection').style.display!=='none') {
+    handleLogin();
+  }
+});
+
+// Close modals when clicking outside
+document.getElementById('mapModal').addEventListener('click', function(e) {
+  if (e.target === this) closeMapModal();
+});
+document.getElementById('scheduleModal').addEventListener('click', function(e) {
+  if (e.target === this) closeScheduleModal();
+});
+
+</script>
+</body>
+</html>
+HTMLEOF
+echo "Done!"
